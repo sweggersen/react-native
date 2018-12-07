@@ -274,7 +274,9 @@ const TouchableOpacity = ((createReactClass({
         onResponderGrant={this.touchableHandleResponderGrant}
         onResponderMove={this.touchableHandleResponderMove}
         onResponderRelease={this.touchableHandleResponderRelease}
-        onResponderTerminate={this.touchableHandleResponderTerminate}>
+        onResponderTerminate={this.touchableHandleResponderTerminate}
+        clickable={this.props.clickable !== false && this.props.onPress !== undefined}
+        onClick={this.touchableHandlePress}>
         {this.props.children}
         {Touchable.renderDebugView({
           color: 'cyan',

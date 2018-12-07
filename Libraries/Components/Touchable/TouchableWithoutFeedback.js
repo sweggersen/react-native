@@ -251,6 +251,8 @@ const TouchableWithoutFeedback = ((createReactClass({
       onResponderMove: this.touchableHandleResponderMove,
       onResponderRelease: this.touchableHandleResponderRelease,
       onResponderTerminate: this.touchableHandleResponderTerminate,
+      clickable: this.props.clickable !== false && this.props.onPress !== undefined,
+      onClick: this.touchableHandlePress,
       children,
     });
   },

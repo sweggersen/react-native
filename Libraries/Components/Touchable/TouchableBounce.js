@@ -173,7 +173,9 @@ const TouchableBounce = ((createReactClass({
         onResponderGrant={this.touchableHandleResponderGrant}
         onResponderMove={this.touchableHandleResponderMove}
         onResponderRelease={this.touchableHandleResponderRelease}
-        onResponderTerminate={this.touchableHandleResponderTerminate}>
+        onResponderTerminate={this.touchableHandleResponderTerminate}
+        clickable={this.props.clickable !== false && this.props.onPress !== undefined && !this.props.disabled}
+        onClick={this.touchableHandlePress}>
         {this.props.children}
         {Touchable.renderDebugView({
           color: 'orange',

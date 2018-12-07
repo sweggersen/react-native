@@ -12,6 +12,7 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.view.View;
 import com.facebook.react.bridge.JSApplicationIllegalArgumentException;
+import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.common.MapBuilder;
@@ -21,10 +22,12 @@ import com.facebook.react.uimanager.PixelUtil;
 import com.facebook.react.uimanager.PointerEvents;
 import com.facebook.react.uimanager.Spacing;
 import com.facebook.react.uimanager.ThemedReactContext;
+import com.facebook.react.uimanager.UIManagerModule;
 import com.facebook.react.uimanager.ViewGroupManager;
 import com.facebook.react.uimanager.ViewProps;
 import com.facebook.react.uimanager.annotations.ReactProp;
 import com.facebook.react.uimanager.annotations.ReactPropGroup;
+import com.facebook.react.uimanager.events.EventDispatcher;
 import com.facebook.yoga.YogaConstants;
 import java.util.Locale;
 import java.util.Map;
@@ -50,11 +53,6 @@ public class ReactViewManager extends ViewGroupManager<ReactViewGroup> {
   };
   private static final int CMD_HOTSPOT_UPDATE = 1;
   private static final int CMD_SET_PRESSED = 2;
-
-  @ReactProp(name = "accessible")
-  public void setAccessible(ReactViewGroup view, boolean accessible) {
-    view.setFocusable(accessible);
-  }
 
   @ReactProp(name = "hasTVPreferredFocus")
   public void setTVPreferredFocus(ReactViewGroup view, boolean hasTVPreferredFocus) {
@@ -136,6 +134,25 @@ public class ReactViewManager extends ViewGroupManager<ReactViewGroup> {
     view.setForeground(fg == null
         ? null
         : ReactDrawableHelper.createDrawableFromJSDescription(view.getContext(), fg));
+  }
+
+  @ReactProp(name = "clickable")
+  public void setClickable(final ReactViewGroup view, boolean clickable) {
+    if (clickable) {
+      view.setOnClickListener(
+          new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+              final EventDispatcher mEventDispatcher =
+                  ((ReactContext)view.getContext()).getNativeModule(UIManagerModule.class)
+                      .getEventDispatcher();
+              mEventDispatcher.dispatchEvent(new ViewGroupClickEvent(view.getId()));
+            }});
+    }
+
+    // Clickable elements are focusable. On API 26, this is taken care by setClickable.
+    // Explicitly calling setFocusable here for backward compatibility.
+    view.setFocusable(true /*isFocusable*/);
   }
 
   @ReactProp(name = com.facebook.react.uimanager.ReactClippingViewGroupHelper.PROP_REMOVE_CLIPPED_SUBVIEWS)

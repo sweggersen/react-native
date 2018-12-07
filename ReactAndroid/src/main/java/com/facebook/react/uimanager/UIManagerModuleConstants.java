@@ -90,6 +90,7 @@ import java.util.Map;
         .put("topScroll", MapBuilder.of(rn, "onScroll"))
         .put("topMomentumScrollBegin", MapBuilder.of(rn, "onMomentumScrollBegin"))
         .put("topMomentumScrollEnd", MapBuilder.of(rn, "onMomentumScrollEnd"))
+        .put("topClick", MapBuilder.of("registrationName", "onClick"))
         .build();
   }
 
