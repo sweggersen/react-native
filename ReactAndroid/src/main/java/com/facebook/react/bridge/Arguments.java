@@ -16,6 +16,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 
 import android.os.Bundle;
+import android.os.Parcelable;
 
 public class Arguments {
   private static Object makeNativeObject(Object object) {
@@ -211,6 +212,14 @@ public class Arguments {
     } else if (array instanceof Bundle[]) {
       for (Bundle v : (Bundle[]) array) {
         catalystArray.pushMap(fromBundle(v));
+      }
+    } else if (array instanceof Parcelable[]) {
+      for (Object o : (Object[]) array) {
+        if (o instanceof Bundle) {
+          catalystArray.pushMap(fromBundle((Bundle) o));
+        } else {
+          throw new IllegalArgumentException("Unknown array type " + o.getClass());
+        }
       }
     } else if (array instanceof int[]) {
       for (int v : (int[]) array) {
