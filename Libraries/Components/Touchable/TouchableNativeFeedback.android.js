@@ -278,7 +278,10 @@ const TouchableNativeFeedback = createReactClass({
       hitSlop: this.props.hitSlop,
       isTVSelectable: true,
       hasTVPreferredFocus: this.props.hasTVPreferredFocus,
-      clickable: this.props.clickable !== false && this.props.onPress !== undefined && !this.props.disabled,
+      clickable:
+        this.props.clickable !== false &&
+        this.props.onPress !== undefined &&
+        !this.props.disabled,
       onClick: this.touchableHandlePress,
       onStartShouldSetResponder: this.touchableHandleStartShouldSetResponder,
       onResponderTerminationRequest: this
