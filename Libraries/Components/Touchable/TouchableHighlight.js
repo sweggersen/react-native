@@ -360,6 +360,8 @@ const TouchableHighlight = ((createReactClass({
         isTVSelectable={true}
         tvParallaxProperties={this.props.tvParallaxProperties}
         hasTVPreferredFocus={this.props.hasTVPreferredFocus}
+        clickable={this.props.clickable !== false && this.props.onPress !== undefined}
+        onClick={this.touchableHandlePress}
         onStartShouldSetResponder={this.touchableHandleStartShouldSetResponder}
         onResponderTerminationRequest={
           this.touchableHandleResponderTerminationRequest

@@ -27,6 +27,7 @@ const {
 import type {
   AccessibilityComponentType,
   AccessibilityTrait,
+  AccessibilityNodeInfoProp,
   AccessibilityRole,
   AccessibilityState,
 } from 'ViewAccessibility';
