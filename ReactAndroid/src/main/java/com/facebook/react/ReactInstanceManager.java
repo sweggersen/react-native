@@ -363,6 +363,10 @@ public class ReactInstanceManager {
     SoLoader.init(applicationContext, /* native exopackage */ false);
   }
 
+  /**
+   * Trigger react context initialization. This enables applications to pre-load the application JS,
+   * and execute global code before {@link ReactRootView} is available and measured.
+   */
   @ThreadConfined(ANY)
   public void createReactContext() {
     if (UiThreadUtil.isOnUiThread()) {
@@ -372,6 +376,11 @@ public class ReactInstanceManager {
     }
   }
 
+  /**
+   * Recreate the react application and context. This should be called if configuration has changed
+   * or the developer has requested the app to be reloaded. It should only be called after an
+   * initial call to createReactContextInBackground.
+   */
   @ThreadConfined(ANY)
   public void recreateReactContext() {
     if (UiThreadUtil.isOnUiThread()) {
@@ -422,8 +431,16 @@ public class ReactInstanceManager {
     recreateReactContextInBackgroundInner();
   }
 
+  /**
+   * Trigger react context initialization. This enables applications to pre-load the application JS,
+   * and execute global code before {@link ReactRootView} is available and measured.
+   *
+   * <p>Called from a worker thread.
+   *
+   * @deprecated Please use the thread agnostic method {@link #createReactContext()}
+   */
   @WorkerThread
-  public void createReactContextFromBackground() {
+  private void createReactContextFromBackground() {
     Log.d(ReactConstants.TAG, "ReactInstanceManager.createReactContextFromBackground()");
     UiThreadUtil.assertNotOnUiThread();
 
@@ -445,10 +462,10 @@ public class ReactInstanceManager {
    * or the developer has requested the app to be reloaded. It should only be called after an
    * initial call to createReactContextInBackground.
    *
-   * <p>Called from UI thread.
+   * <p>Called from a worker thread.
    */
   @WorkerThread
-  public void recreateReactContextFromBackground() {
+  private void recreateReactContextFromBackground() {
     Assertions.assertCondition(
             mHasStartedCreatingInitialContext,
             "recreateReactContextFromBackground should only be called after the initial "
