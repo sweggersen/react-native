@@ -494,8 +494,7 @@ public class ReactInstanceManager {
   }
 
   private void recreateReactContextInner() {
-    boolean runOnUiThread = UiThreadUtil.isOnUiThread();
-
+    boolean continueToRunOnUiThread = UiThreadUtil.isOnUiThread();
     if (mUseDeveloperSupport && mJSMainModulePath != null) {
       final DeveloperSettings devSettings = mDevSupportManager.getDevSettings();
 
@@ -524,7 +523,7 @@ public class ReactInstanceManager {
                           }
                         }
                       };
-                      if (runOnUiThread) {
+                      if (continueToRunOnUiThread) {
                         UiThreadUtil.runOnUiThread(packageStatusFetchedRunnable);
                       } else {
                         packageStatusFetchedRunnable.run();
@@ -1083,7 +1082,7 @@ public class ReactInstanceManager {
       }
     }
 
-    final boolean runOnUiThread = UiThreadUtil.isOnUiThread();
+    final boolean isOnUiThread = UiThreadUtil.isOnUiThread();
     Runnable createReactContextRunnable = new Runnable() {
       @Override
       public void run() {
@@ -1135,7 +1134,7 @@ public class ReactInstanceManager {
 
           reactApplicationContext.runOnNativeModulesQueueThread(setupReactContextRunnable);
 
-          if (runOnUiThread) {
+          if (isOnUiThread) {
             UiThreadUtil.runOnUiThread(maybeRecreateReactContextRunnable);
           } else {
             maybeRecreateReactContextRunnable.run();
@@ -1147,7 +1146,7 @@ public class ReactInstanceManager {
     };
 
     ReactMarker.logMarker(REACT_CONTEXT_THREAD_START);
-    if (runOnUiThread) {
+    if (isOnUiThread) {
       mCreateReactContextThread = new Thread(null, createReactContextRunnable,
               "create_react_context");
       mCreateReactContextThread.start();
