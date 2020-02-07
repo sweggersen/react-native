@@ -7,6 +7,7 @@
 
 package com.facebook.react;
 
+import static com.facebook.infer.annotation.ThreadConfined.ANY;
 import static com.facebook.infer.annotation.ThreadConfined.UI;
 import static com.facebook.react.bridge.ReactMarkerConstants.ATTACH_MEASURED_ROOT_VIEWS_END;
 import static com.facebook.react.bridge.ReactMarkerConstants.ATTACH_MEASURED_ROOT_VIEWS_START;
@@ -40,8 +41,10 @@ import android.net.Uri;
 import android.nfc.NfcAdapter;
 import android.os.Bundle;
 import android.os.Process;
+import android.util.Log;
 import android.view.View;
 import androidx.annotation.Nullable;
+import androidx.annotation.WorkerThread;
 import androidx.core.view.ViewCompat;
 import com.facebook.common.logging.FLog;
 import com.facebook.debug.holder.PrinterHolder;
@@ -360,18 +363,40 @@ public class ReactInstanceManager {
     SoLoader.init(applicationContext, /* native exopackage */ false);
   }
 
+  @ThreadConfined(ANY)
+  public void createReactContext() {
+    if (UiThreadUtil.isOnUiThread()) {
+      createReactContextInBackground();
+    } else {
+      createReactContextFromBackground();
+    }
+  }
+
+  @ThreadConfined(ANY)
+  public void recreateReactContext() {
+    if (UiThreadUtil.isOnUiThread()) {
+      recreateReactContextInBackground();
+    } else {
+      recreateReactContextFromBackground();
+    }
+  }
+
   /**
    * Trigger react context initialization asynchronously in a background async task. This enables
    * applications to pre-load the application JS, and execute global code before {@link
    * ReactRootView} is available and measured.
    *
    * <p>Called from UI thread.
+   *
+   * @deprecated Please use the thread agnostic method {@link #createReactContext()}
    */
+  @Deprecated
   @ThreadConfined(UI)
   public void createReactContextInBackground() {
     FLog.d(TAG, "ReactInstanceManager.createReactContextInBackground()");
     UiThreadUtil
         .assertOnUiThread(); // Assert before setting mHasStartedCreatingInitialContext = true
+
     if (!mHasStartedCreatingInitialContext) {
       mHasStartedCreatingInitialContext = true;
       recreateReactContextInBackgroundInner();
@@ -384,22 +409,75 @@ public class ReactInstanceManager {
    * initial call to createReactContextInBackground.
    *
    * <p>Called from UI thread.
+   *
+   * @deprecated Please use the thread agnostic method {@link #recreateReactContext()}
    */
+  @Deprecated
   @ThreadConfined(UI)
   public void recreateReactContextInBackground() {
     Assertions.assertCondition(
-        mHasStartedCreatingInitialContext,
-        "recreateReactContextInBackground should only be called after the initial "
-            + "createReactContextInBackground call.");
+            mHasStartedCreatingInitialContext,
+            "recreateReactContextInBackground should only be called after the initial "
+                    + "createReactContextInBackground call.");
     recreateReactContextInBackgroundInner();
   }
+
+  @WorkerThread
+  public void createReactContextFromBackground() {
+    Log.d(ReactConstants.TAG, "ReactInstanceManager.createReactContextFromBackground()");
+    UiThreadUtil.assertNotOnUiThread();
+
+    boolean createInitialContext = false;
+    synchronized (mReactContextLock) {
+      if (!mHasStartedCreatingInitialContext) {
+        mHasStartedCreatingInitialContext = true;
+        createInitialContext = true;
+      }
+    }
+
+    if (createInitialContext) {
+      recreateReactContextFromBackgroundInner();
+    }
+  }
+
+  /**
+   * Recreate the react application and context. This should be called if configuration has changed
+   * or the developer has requested the app to be reloaded. It should only be called after an
+   * initial call to createReactContextInBackground.
+   *
+   * <p>Called from UI thread.
+   */
+  @WorkerThread
+  public void recreateReactContextFromBackground() {
+    Assertions.assertCondition(
+            mHasStartedCreatingInitialContext,
+            "recreateReactContextFromBackground should only be called after the initial "
+                    + "createReactContextFromBackground call.");
+    recreateReactContextFromBackgroundInner();
+  }
+
 
   @ThreadConfined(UI)
   private void recreateReactContextInBackgroundInner() {
     FLog.d(TAG, "ReactInstanceManager.recreateReactContextInBackgroundInner()");
     PrinterHolder.getPrinter()
-        .logMessage(ReactDebugOverlayTags.RN_CORE, "RNCore: recreateReactContextInBackground");
+            .logMessage(ReactDebugOverlayTags.RN_CORE, "RNCore: recreateReactContextInBackground");
     UiThreadUtil.assertOnUiThread();
+
+    recreateReactContextInner();
+  }
+
+  @WorkerThread
+  private void recreateReactContextFromBackgroundInner() {
+    Log.d(ReactConstants.TAG, "ReactInstanceManager.recreateReactContextFromBackgroundInner()");
+    PrinterHolder.getPrinter()
+            .logMessage(ReactDebugOverlayTags.RN_CORE, "RNCore: recreateReactContextFromBackground");
+
+    recreateReactContextInner();
+  }
+
+  private void recreateReactContextInner() {
+    boolean runOnUiThread = UiThreadUtil.isOnUiThread();
 
     if (mUseDeveloperSupport && mJSMainModulePath != null) {
       final DeveloperSettings devSettings = mDevSupportManager.getDevSettings();
@@ -409,43 +487,47 @@ public class ReactInstanceManager {
           mDevSupportManager.handleReloadJS();
         } else {
           mDevSupportManager.isPackagerRunning(
-              new PackagerStatusCallback() {
-                @Override
-                public void onPackagerStatusFetched(final boolean packagerIsRunning) {
-                  UiThreadUtil.runOnUiThread(
-                      new Runnable() {
+                  new PackagerStatusCallback() {
+                    @Override
+                    public void onPackagerStatusFetched(final boolean packagerIsRunning) {
+                      Runnable packageStatusFetchedRunnable = new Runnable() {
                         @Override
                         public void run() {
                           if (packagerIsRunning) {
                             mDevSupportManager.handleReloadJS();
                           } else if (mDevSupportManager.hasUpToDateJSBundleInCache()
-                              && !devSettings.isRemoteJSDebugEnabled()) {
+                                  && !devSettings.isRemoteJSDebugEnabled()) {
                             // If there is a up-to-date bundle downloaded from server,
                             // with remote JS debugging disabled, always use that.
                             onJSBundleLoadedFromServer();
                           } else {
                             // If dev server is down, disable the remote JS debugging.
                             devSettings.setRemoteJSDebugEnabled(false);
-                            recreateReactContextInBackgroundFromBundleLoader();
+                            recreateReactContextFromBundleLoader();
                           }
                         }
-                      });
-                }
-              });
+                      };
+                      if (runOnUiThread) {
+                        UiThreadUtil.runOnUiThread(packageStatusFetchedRunnable);
+                      } else {
+                        packageStatusFetchedRunnable.run();
+                      }
+                    }
+                  });
         }
         return;
       }
     }
 
-    recreateReactContextInBackgroundFromBundleLoader();
+    recreateReactContextFromBundleLoader();
   }
 
   @ThreadConfined(UI)
-  private void recreateReactContextInBackgroundFromBundleLoader() {
-    FLog.d(TAG, "ReactInstanceManager.recreateReactContextInBackgroundFromBundleLoader()");
+  private void recreateReactContextFromBundleLoader() {
+    FLog.d(TAG, "ReactInstanceManager.recreateReactContextFromBundleLoader()");
     PrinterHolder.getPrinter()
         .logMessage(ReactDebugOverlayTags.RN_CORE, "RNCore: load from BundleLoader");
-    recreateReactContextInBackground(mJavaScriptExecutorFactory, mBundleLoader);
+    recreateReactContext(mJavaScriptExecutorFactory, mBundleLoader);
   }
 
   /**
@@ -943,14 +1025,13 @@ public class ReactInstanceManager {
   @ThreadConfined(UI)
   private void onReloadWithJSDebugger(JavaJSExecutor.Factory jsExecutorFactory) {
     FLog.d(ReactConstants.TAG, "ReactInstanceManager.onReloadWithJSDebugger()");
-    recreateReactContextInBackground(
+    recreateReactContext(
         new ProxyJavaScriptExecutor.Factory(jsExecutorFactory),
         JSBundleLoader.createRemoteDebuggerBundleLoader(
             mDevSupportManager.getJSBundleURLForRemoteDebugging(),
             mDevSupportManager.getSourceUrl()));
   }
 
-  @ThreadConfined(UI)
   private void onJSBundleLoadedFromServer() {
     FLog.d(ReactConstants.TAG, "ReactInstanceManager.onJSBundleLoadedFromServer()");
 
@@ -958,14 +1039,12 @@ public class ReactInstanceManager {
         JSBundleLoader.createCachedBundleFromNetworkLoader(
             mDevSupportManager.getSourceUrl(), mDevSupportManager.getDownloadedJSBundleFile());
 
-    recreateReactContextInBackground(mJavaScriptExecutorFactory, bundleLoader);
+    recreateReactContext(mJavaScriptExecutorFactory, bundleLoader);
   }
 
-  @ThreadConfined(UI)
-  private void recreateReactContextInBackground(
+  private void recreateReactContext(
       JavaScriptExecutorFactory jsExecutorFactory, JSBundleLoader jsBundleLoader) {
-    FLog.d(ReactConstants.TAG, "ReactInstanceManager.recreateReactContextInBackground()");
-    UiThreadUtil.assertOnUiThread();
+    FLog.d(ReactConstants.TAG, "ReactInstanceManager.recreateReactContext()");
 
     final ReactContextInitParams initParams =
         new ReactContextInitParams(jsExecutorFactory, jsBundleLoader);
@@ -976,10 +1055,8 @@ public class ReactInstanceManager {
     }
   }
 
-  @ThreadConfined(UI)
   private void runCreateReactContextOnNewThread(final ReactContextInitParams initParams) {
     FLog.d(ReactConstants.TAG, "ReactInstanceManager.runCreateReactContextOnNewThread()");
-    UiThreadUtil.assertOnUiThread();
     synchronized (mAttachedReactRoots) {
       synchronized (mReactContextLock) {
         if (mCurrentReactContext != null) {
@@ -989,68 +1066,77 @@ public class ReactInstanceManager {
       }
     }
 
-    mCreateReactContextThread =
-        new Thread(
-            null,
-            new Runnable() {
-              @Override
-              public void run() {
-                ReactMarker.logMarker(REACT_CONTEXT_THREAD_END);
-                synchronized (ReactInstanceManager.this.mHasStartedDestroying) {
-                  while (ReactInstanceManager.this.mHasStartedDestroying) {
-                    try {
-                      ReactInstanceManager.this.mHasStartedDestroying.wait();
-                    } catch (InterruptedException e) {
-                      continue;
-                    }
-                  }
-                }
-                // As destroy() may have run and set this to false, ensure that it is true before we
-                // create
-                mHasStartedCreatingInitialContext = true;
+    final boolean runOnUiThread = UiThreadUtil.isOnUiThread();
+    Runnable createReactContextRunnable = new Runnable() {
+      @Override
+      public void run() {
+        ReactMarker.logMarker(REACT_CONTEXT_THREAD_END);
+        synchronized (mHasStartedDestroying) {
+          while (mHasStartedDestroying) {
+            try {
+              mHasStartedDestroying.wait();
+            } catch (InterruptedException e) {
+              continue;
+            }
+          }
+        }
+        // As destroy() may have run and set this to false, ensure that it is true before we
+        // create
+        mHasStartedCreatingInitialContext = true;
 
-                try {
-                  Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
-                  ReactMarker.logMarker(VM_INIT);
-                  final ReactApplicationContext reactApplicationContext =
-                      createReactContext(
+        try {
+          Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
+          ReactMarker.logMarker(VM_INIT);
+          final ReactApplicationContext reactApplicationContext =
+                  createReactContext(
                           initParams.getJsExecutorFactory().create(),
                           initParams.getJsBundleLoader());
 
-                  mCreateReactContextThread = null;
-                  ReactMarker.logMarker(PRE_SETUP_REACT_CONTEXT_START);
-                  final Runnable maybeRecreateReactContextRunnable =
-                      new Runnable() {
-                        @Override
-                        public void run() {
-                          if (mPendingReactContextInitParams != null) {
-                            runCreateReactContextOnNewThread(mPendingReactContextInitParams);
-                            mPendingReactContextInitParams = null;
-                          }
-                        }
-                      };
-                  Runnable setupReactContextRunnable =
-                      new Runnable() {
-                        @Override
-                        public void run() {
-                          try {
-                            setupReactContext(reactApplicationContext);
-                          } catch (Exception e) {
-                            mDevSupportManager.handleException(e);
-                          }
-                        }
-                      };
+          mCreateReactContextThread = null;
+          ReactMarker.logMarker(PRE_SETUP_REACT_CONTEXT_START);
+          final Runnable maybeRecreateReactContextRunnable =
+                  new Runnable() {
+                    @Override
+                    public void run() {
+                      if (mPendingReactContextInitParams != null) {
+                        runCreateReactContextOnNewThread(mPendingReactContextInitParams);
+                        mPendingReactContextInitParams = null;
+                      }
+                    }
+                  };
+          Runnable setupReactContextRunnable =
+                  new Runnable() {
+                    @Override
+                    public void run() {
+                      try {
+                        setupReactContext(reactApplicationContext);
+                      } catch (Exception e) {
+                        mDevSupportManager.handleException(e);
+                      }
+                    }
+                  };
 
-                  reactApplicationContext.runOnNativeModulesQueueThread(setupReactContextRunnable);
-                  UiThreadUtil.runOnUiThread(maybeRecreateReactContextRunnable);
-                } catch (Exception e) {
-                  mDevSupportManager.handleException(e);
-                }
-              }
-            },
-            "create_react_context");
+          reactApplicationContext.runOnNativeModulesQueueThread(setupReactContextRunnable);
+
+          if (runOnUiThread) {
+            UiThreadUtil.runOnUiThread(maybeRecreateReactContextRunnable);
+          } else {
+            maybeRecreateReactContextRunnable.run();
+          }
+        } catch (Exception e) {
+          mDevSupportManager.handleException(e);
+        }
+      }
+    };
+
     ReactMarker.logMarker(REACT_CONTEXT_THREAD_START);
-    mCreateReactContextThread.start();
+    if (runOnUiThread) {
+      mCreateReactContextThread = new Thread(null, createReactContextRunnable,
+              "create_react_context");
+      mCreateReactContextThread.start();
+    } else {
+      createReactContextRunnable.run();
+    }
   }
 
   private void setupReactContext(final ReactApplicationContext reactContext) {

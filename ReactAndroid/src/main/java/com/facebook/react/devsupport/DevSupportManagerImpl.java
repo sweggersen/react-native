@@ -853,8 +853,6 @@ public class DevSupportManagerImpl
   @Override
   public void handleReloadJS() {
 
-    UiThreadUtil.assertOnUiThread();
-
     ReactMarker.logMarker(
         ReactMarkerConstants.RELOAD,
         mDevSettings.getPackagerConnectionSettings().getDebugServerHost());
