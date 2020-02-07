@@ -109,7 +109,7 @@ public abstract class HeadlessJsTaskService extends Service implements HeadlessJ
           }
         });
       if (!reactInstanceManager.hasStartedCreatingInitialContext()) {
-        reactInstanceManager.createReactContextInBackground();
+        reactInstanceManager.createReactContext();
       }
     } else {
       invokeStartTask(reactContext, taskConfig);

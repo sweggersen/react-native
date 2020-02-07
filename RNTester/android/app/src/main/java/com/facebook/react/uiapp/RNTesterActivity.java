@@ -19,7 +19,8 @@ public class RNTesterActivity extends ReactActivity {
   public static class RNTesterActivityDelegate extends ReactActivityDelegate {
     private static final String PARAM_ROUTE = "route";
     private Bundle mInitialProps = null;
-    private final @Nullable ReactActivity mActivity;
+    private final @Nullable
+    ReactActivity mActivity;
 
     public RNTesterActivityDelegate(ReactActivity activity, String mainComponentName) {
       super(activity, mainComponentName);
