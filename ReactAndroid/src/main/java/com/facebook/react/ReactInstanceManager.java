@@ -436,8 +436,6 @@ public class ReactInstanceManager {
    * and execute global code before {@link ReactRootView} is available and measured.
    *
    * <p>Called from a worker thread.
-   *
-   * @deprecated Please use the thread agnostic method {@link #createReactContext()}
    */
   @WorkerThread
   private void createReactContextFromBackground() {
