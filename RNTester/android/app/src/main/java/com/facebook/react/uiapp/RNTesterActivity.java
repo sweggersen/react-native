@@ -9,6 +9,8 @@ package com.facebook.react.uiapp;
 
 import android.content.res.Configuration;
 import android.os.Bundle;
+
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import com.facebook.react.ReactActivity;
 import com.facebook.react.ReactActivityDelegate;
@@ -58,7 +60,7 @@ public class RNTesterActivity extends ReactActivity {
   }
 
   @Override
-  public void onConfigurationChanged(Configuration newConfig) {
+  public void onConfigurationChanged(@NonNull Configuration newConfig) {
     super.onConfigurationChanged(newConfig);
     ReactInstanceManager instanceManager = getReactInstanceManager();
 
