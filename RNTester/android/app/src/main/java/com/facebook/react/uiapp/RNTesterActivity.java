@@ -9,6 +9,7 @@ package com.facebook.react.uiapp;
 
 import android.content.res.Configuration;
 import android.os.Bundle;
+
 import androidx.annotation.Nullable;
 import com.facebook.react.ReactActivity;
 import com.facebook.react.ReactActivityDelegate;

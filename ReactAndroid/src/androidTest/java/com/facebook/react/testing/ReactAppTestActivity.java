@@ -7,8 +7,6 @@
 
 package com.facebook.react.testing;
 
-import static com.facebook.react.bridge.UiThreadUtil.runOnUiThread;
-
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;

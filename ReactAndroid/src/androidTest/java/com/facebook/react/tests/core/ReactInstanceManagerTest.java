@@ -82,7 +82,7 @@ public class ReactInstanceManagerTest {
   @UiThreadTest
   public void testRecreateContext() throws InterruptedException {
     mReactInstanceManager.onHostResume(mActivityRule.getActivity());
-    mReactInstanceManager.createReactContextInBackground();
+    mReactInstanceManager.createReactContext();
     mReactRootView.startReactApplication(mReactInstanceManager, TEST_MODULE);
   }
 

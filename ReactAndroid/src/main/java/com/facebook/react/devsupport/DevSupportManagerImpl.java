@@ -852,9 +852,6 @@ public class DevSupportManagerImpl
 
   @Override
   public void handleReloadJS() {
-
-    UiThreadUtil.assertOnUiThread();
-
     ReactMarker.logMarker(
         ReactMarkerConstants.RELOAD,
         mDevSettings.getPackagerConnectionSettings().getDebugServerHost());
@@ -923,13 +920,7 @@ public class DevSupportManagerImpl
   public void onPackagerReloadCommand() {
     // Disable debugger to resume the JsVM & avoid thread locks while reloading
     mDevServerHelper.disableDebugger();
-    UiThreadUtil.runOnUiThread(
-        new Runnable() {
-          @Override
-          public void run() {
-            handleReloadJS();
-          }
-        });
+    handleReloadJS();
   }
 
   @Override
@@ -1059,15 +1050,9 @@ public class DevSupportManagerImpl
             if (mBundleDownloadListener != null) {
               mBundleDownloadListener.onSuccess();
             }
-            UiThreadUtil.runOnUiThread(
-                new Runnable() {
-                  @Override
-                  public void run() {
-                    ReactMarker.logMarker(
-                        ReactMarkerConstants.DOWNLOAD_END, bundleInfo.toJSONString());
-                    mReactInstanceManagerHelper.onJSBundleLoadedFromServer();
-                  }
-                });
+
+            ReactMarker.logMarker(ReactMarkerConstants.DOWNLOAD_END, bundleInfo.toJSONString());
+            mReactInstanceManagerHelper.onJSBundleLoadedFromServer();
           }
 
           @Override
@@ -1092,19 +1077,14 @@ public class DevSupportManagerImpl
               mBundleDownloadListener.onFailure(cause);
             }
             FLog.e(ReactConstants.TAG, "Unable to download JS bundle", cause);
-            UiThreadUtil.runOnUiThread(
-                new Runnable() {
-                  @Override
-                  public void run() {
-                    if (cause instanceof DebugServerException) {
-                      DebugServerException debugServerException = (DebugServerException) cause;
-                      showNewJavaError(debugServerException.getMessage(), cause);
-                    } else {
-                      showNewJavaError(
-                          mApplicationContext.getString(R.string.catalyst_reload_error), cause);
-                    }
-                  }
-                });
+
+            if (cause instanceof DebugServerException) {
+              DebugServerException debugServerException = (DebugServerException) cause;
+              showNewJavaError(debugServerException.getMessage(), cause);
+            } else {
+              showNewJavaError(
+                mApplicationContext.getString(R.string.catalyst_reload_error), cause);
+            }
           }
         },
         mJSBundleTempFile,
@@ -1130,14 +1110,8 @@ public class DevSupportManagerImpl
       return;
     }
 
-    UiThreadUtil.runOnUiThread(
-        new Runnable() {
-          @Override
-          public void run() {
-            mDevSettings.setHotModuleReplacementEnabled(isHotModuleReplacementEnabled);
-            handleReloadJS();
-          }
-        });
+    mDevSettings.setHotModuleReplacementEnabled(isHotModuleReplacementEnabled);
+    handleReloadJS();
   }
 
   @Override
@@ -1146,14 +1120,8 @@ public class DevSupportManagerImpl
       return;
     }
 
-    UiThreadUtil.runOnUiThread(
-        new Runnable() {
-          @Override
-          public void run() {
-            mDevSettings.setRemoteJSDebugEnabled(isRemoteJSDebugEnabled);
-            handleReloadJS();
-          }
-        });
+    mDevSettings.setRemoteJSDebugEnabled(isRemoteJSDebugEnabled);
+    handleReloadJS();
   }
 
   @Override
@@ -1162,13 +1130,7 @@ public class DevSupportManagerImpl
       return;
     }
 
-    UiThreadUtil.runOnUiThread(
-        new Runnable() {
-          @Override
-          public void run() {
-            mDevSettings.setFpsDebugEnabled(isFpsDebugEnabled);
-          }
-        });
+    mDevSettings.setFpsDebugEnabled(isFpsDebugEnabled);
   }
 
   @Override
