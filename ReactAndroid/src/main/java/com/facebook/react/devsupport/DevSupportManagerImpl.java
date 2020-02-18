@@ -852,7 +852,6 @@ public class DevSupportManagerImpl
 
   @Override
   public void handleReloadJS() {
-
     ReactMarker.logMarker(
         ReactMarkerConstants.RELOAD,
         mDevSettings.getPackagerConnectionSettings().getDebugServerHost());
