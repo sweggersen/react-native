@@ -109,6 +109,8 @@ import static com.facebook.react.bridge.ReactMarkerConstants.PROCESS_PACKAGES_EN
 import static com.facebook.react.bridge.ReactMarkerConstants.PROCESS_PACKAGES_START;
 import static com.facebook.react.bridge.ReactMarkerConstants.REACT_CONTEXT_THREAD_END;
 import static com.facebook.react.bridge.ReactMarkerConstants.REACT_CONTEXT_THREAD_START;
+import static com.facebook.react.bridge.ReactMarkerConstants.REACT_CONTEXT_CREATE_END;
+import static com.facebook.react.bridge.ReactMarkerConstants.REACT_CONTEXT_CREATE_START;
 import static com.facebook.react.bridge.ReactMarkerConstants.SETUP_REACT_CONTEXT_END;
 import static com.facebook.react.bridge.ReactMarkerConstants.SETUP_REACT_CONTEXT_START;
 import static com.facebook.react.bridge.ReactMarkerConstants.VM_INIT;
@@ -377,6 +379,9 @@ public class ReactInstanceManager {
    */
   @ThreadConfined(ANY)
   public void createReactContext() {
+    ReactMarker.logMarker(REACT_CONTEXT_CREATE_START);
+    FLog.d(ReactConstants.TAG, "ReactInstanceManager.createReactContext()");
+
     if (UiThreadUtil.isOnUiThread()) {
       createReactContextInBackground();
     } else {
@@ -392,6 +397,7 @@ public class ReactInstanceManager {
   @SuppressWarnings({"WeakerAccess", "unused"})
   @ThreadConfined(ANY)
   public void recreateReactContext() {
+    FLog.d(ReactConstants.TAG, "ReactInstanceManager.recreateReactContext()");
     if (UiThreadUtil.isOnUiThread()) {
       recreateReactContextInBackground();
     } else {
@@ -451,7 +457,7 @@ public class ReactInstanceManager {
    */
   @WorkerThread
   private void createReactContextFromBackground() {
-    Log.d(ReactConstants.TAG, "ReactInstanceManager.createReactContextFromBackground()");
+    FLog.d(ReactConstants.TAG, "ReactInstanceManager.createReactContextFromBackground()");
     UiThreadUtil.assertNotOnUiThread();
 
     boolean createInitialContext = false;
@@ -496,7 +502,7 @@ public class ReactInstanceManager {
 
   @WorkerThread
   private void recreateReactContextFromBackgroundInner() {
-    Log.d(ReactConstants.TAG, "ReactInstanceManager.recreateReactContextFromBackgroundInner()");
+    FLog.d(ReactConstants.TAG, "ReactInstanceManager.recreateReactContextFromBackgroundInner()");
     PrinterHolder.getPrinter()
             .logMessage(ReactDebugOverlayTags.RN_CORE, "RNCore: recreateReactContextFromBackground");
 
@@ -1131,76 +1137,65 @@ public class ReactInstanceManager {
       }
     }
 
-    final boolean continueToRunOnUiThread = UiThreadUtil.isOnUiThread();
-    Runnable createReactContextRunnable = new Runnable() {
-      @Override
-      public void run() {
-        ReactMarker.logMarker(REACT_CONTEXT_THREAD_END);
-        //noinspection SynchronizeOnNonFinalField
-        synchronized (mHasStartedDestroying) {
-          while (mHasStartedDestroying) {
-            try {
-              mHasStartedDestroying.wait();
-            } catch (InterruptedException e) {
-              continue;
-            }
-          }
-        }
-        // As destroy() may have run and set this to false, ensure that it is true before we create
-        mHasStartedCreatingInitialContext = true;
-
-        try {
+    if (UiThreadUtil.isOnUiThread()) {
+      ReactMarker.logMarker(REACT_CONTEXT_THREAD_START);
+      mCreateReactContextThread = new Thread(null, new Runnable()  {
+        @Override
+        public void run() {
           Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
-          ReactMarker.logMarker(VM_INIT);
-          final ReactApplicationContext reactApplicationContext =
-                  createReactContext(
-                          initParams.getJsExecutorFactory().create(),
-                          initParams.getJsBundleLoader());
-
-          mCreateReactContextThread = null;
-          ReactMarker.logMarker(PRE_SETUP_REACT_CONTEXT_START);
-          final Runnable maybeRecreateReactContextRunnable =
-                  new Runnable() {
-                    @Override
-                    public void run() {
-                      if (mPendingReactContextInitParams != null) {
-                        runCreateReactContext(mPendingReactContextInitParams);
-                        mPendingReactContextInitParams = null;
-                      }
-                    }
-                  };
-          Runnable setupReactContextRunnable =
-                  new Runnable() {
-                    @Override
-                    public void run() {
-                      try {
-                        setupReactContext(reactApplicationContext);
-                      } catch (Exception e) {
-                        mDevSupportManager.handleException(e);
-                      }
-                    }
-                  };
-
-          reactApplicationContext.runOnNativeModulesQueueThread(setupReactContextRunnable);
-
-          if (continueToRunOnUiThread) {
-            UiThreadUtil.runOnUiThread(maybeRecreateReactContextRunnable);
-          } else {
-            maybeRecreateReactContextRunnable.run();
-          }
-        } catch (Exception e) {
-          mDevSupportManager.handleException(e);
+          runCreateReactContextInner(initParams);
         }
-      }
-    };
-
-    ReactMarker.logMarker(REACT_CONTEXT_THREAD_START);
-    if (continueToRunOnUiThread) {
-      mCreateReactContextThread = new Thread(null, createReactContextRunnable,
-              "create_react_context");
+      }, "create_react_context");
       mCreateReactContextThread.start();
     } else {
-      createReactContextRunnable.run();
+      runCreateReactContextInner(initParams);
+    }
+  }
+
+  private void runCreateReactContextInner(final ReactContextInitParams initParams) {
+    ReactMarker.logMarker(REACT_CONTEXT_THREAD_END);
+    //noinspection SynchronizeOnNonFinalField
+    synchronized (mHasStartedDestroying) {
+      while (mHasStartedDestroying) {
+        try {
+          mHasStartedDestroying.wait();
+        } catch (InterruptedException e) {
+          continue;
+        }
+      }
+    }
+    // As destroy() may have run and set this to false, ensure that it is true before we create
+    mHasStartedCreatingInitialContext = true;
+
+    try {
+      ReactMarker.logMarker(VM_INIT);
+      final ReactApplicationContext reactApplicationContext =
+        createReactContext(
+          initParams.getJsExecutorFactory().create(),
+          initParams.getJsBundleLoader());
+
+      mCreateReactContextThread = null;
+      ReactMarker.logMarker(PRE_SETUP_REACT_CONTEXT_START);
+      Runnable setupReactContextRunnable =
+        new Runnable() {
+          @Override
+          public void run() {
+            try {
+              setupReactContext(reactApplicationContext);
+            } catch (Exception e) {
+              mDevSupportManager.handleException(e);
+            }
+          }
+        };
+
+      reactApplicationContext.runOnNativeModulesQueueThread(setupReactContextRunnable);
+
+      if (mPendingReactContextInitParams != null) {
+        runCreateReactContext(mPendingReactContextInitParams);
+        mPendingReactContextInitParams = null;
+      }
+    } catch (Exception e) {
+      mDevSupportManager.handleException(e);
     }
   }
 
@@ -1245,6 +1240,7 @@ public class ReactInstanceManager {
         });
     Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
     ReactMarker.logMarker(SETUP_REACT_CONTEXT_END);
+    ReactMarker.logMarker(REACT_CONTEXT_CREATE_END);
     reactContext.runOnJSQueueThread(
         new Runnable() {
           @Override
