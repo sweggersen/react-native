@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 
@@ -102,42 +103,72 @@ public class CatalystInstanceImpl implements CatalystInstance {
   private native static HybridData initHybrid();
   public native JSCallInvokerHolderImpl getJSCallInvokerHolder();
 
+  private double toMs(long nano) {
+    return TimeUnit.MICROSECONDS.convert(nano, TimeUnit.NANOSECONDS);
+  }
+
+  private long logDuration(String tag, long start, long lastCheckpoint) {
+    long current = System.nanoTime();
+    Log.d("CATINSTIMPL:" + tag, "Sum: " + toMs(current-start) + " Since last: " + toMs(current - lastCheckpoint));
+    return current;
+  }
+
   private CatalystInstanceImpl(
       final ReactQueueConfigurationSpec reactQueueConfigurationSpec,
       final JavaScriptExecutor jsExecutor,
       final NativeModuleRegistry nativeModuleRegistry,
       final JSBundleLoader jsBundleLoader,
       NativeModuleCallExceptionHandler nativeModuleCallExceptionHandler) {
+    long start = System.nanoTime();
+    long check = start;
+    check = logDuration("0",  start, check);
+
     Log.d(ReactConstants.TAG, "Initializing React Xplat Bridge.");
     Systrace.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "createCatalystInstanceImpl");
 
+    check = logDuration("1",  start, check);
     mHybridData = initHybrid();
 
+    check = logDuration("2",  start, check);
     mReactQueueConfiguration = ReactQueueConfigurationImpl.create(
         reactQueueConfigurationSpec,
         new NativeExceptionHandler());
+    check = logDuration("3",  start, check);
     mBridgeIdleListeners = new CopyOnWriteArrayList<>();
+    check = logDuration("4",  start, check);
     mNativeModuleRegistry = nativeModuleRegistry;
+    check = logDuration("5",  start, check);
     mJSModuleRegistry = new JavaScriptModuleRegistry();
+    check = logDuration("6",  start, check);
     mJSBundleLoader = jsBundleLoader;
     mNativeModuleCallExceptionHandler = nativeModuleCallExceptionHandler;
+    check = logDuration("7",  start, check);
     mNativeModulesQueueThread = mReactQueueConfiguration.getNativeModulesQueueThread();
+    check = logDuration("8",  start, check);
     mTraceListener = new JSProfilerTraceListener(this);
+    check = logDuration("9",  start, check);
     Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
+    check = logDuration("10",  start, check);
 
     Log.d(ReactConstants.TAG, "Initializing React Xplat Bridge before initializeBridge");
+    check = logDuration("11",  start, check);
     Systrace.beginSection(TRACE_TAG_REACT_JAVA_BRIDGE, "initializeCxxBridge");
-    initializeBridge(
-      new BridgeCallback(this),
-      jsExecutor,
-      mReactQueueConfiguration.getJSQueueThread(),
-      mNativeModulesQueueThread,
-      mNativeModuleRegistry.getJavaModules(this),
-      mNativeModuleRegistry.getCxxModules());
+    check = logDuration("12",  start, check);
+    BridgeCallback bc = new BridgeCallback(this);
+    check = logDuration("13",  start, check);
+    MessageQueueThread mqt = mReactQueueConfiguration.getJSQueueThread();
+    check = logDuration("14",  start, check);
+    Collection<JavaModuleWrapper> jmw = mNativeModuleRegistry.getJavaModules(this);
+    check = logDuration("15",  start, check);
+    Collection<ModuleHolder> cxx = mNativeModuleRegistry.getCxxModules();
+    check = logDuration("16",  start, check);
+    initializeBridge(bc, jsExecutor, mqt, mNativeModulesQueueThread, jmw, cxx);
+    check = logDuration("17",  start, check);
     Log.d(ReactConstants.TAG, "Initializing React Xplat Bridge after initializeBridge");
     Systrace.endSection(TRACE_TAG_REACT_JAVA_BRIDGE);
 
     mJavaScriptContextHolder = new JavaScriptContextHolder(getJavaScriptContext());
+    logDuration("18",  start, check);
   }
 
   private static class BridgeCallback implements ReactCallback {
